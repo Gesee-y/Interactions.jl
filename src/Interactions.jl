@@ -4,11 +4,8 @@
 
 module Interactions
 
-include(joinpath("..", "..", "Arceus.jl","src", "Arceus.jl"))
-include(joinpath("..", "..", "MathLib.jl","src", "MathLib.jl"))
-
-using .MathLib
-using .Arceus
+using GDMathLib
+using Arceus
 
 const IReal = Float32
 
@@ -31,5 +28,6 @@ include("constraints.jl")
 include("rigidbody.jl")
 include("grid.jl")
 include("world.jl")
+
 
 end # module
