@@ -2,7 +2,7 @@
 ###################################################### WORLDS ########################################################
 ######################################################################################################################
 
-export IWorld
+export IWorld, IWorld2D, IWorld3D
 export start_frame, run_physics!
 
 ####################################################### CORE #########################################################
@@ -14,8 +14,17 @@ mutable struct IWorld{N}
 	max_contact::Int
 	fregistry::ForceRegistry
 	resolver::IContactResolver
+	grid::CollisionGrid{Particle{N}, 32}
 	calc_iterations::Bool
+
+	## Constructors
+
+	IWorld{N}(max_contact=128, iter=false) where N = new{N}(Particle{N}[], ContactGenerator[], IContact{N}[],
+	    max_contact, ForceRegistry(), IContactResolver(), CollisionGrid{Particle{N}, 32}((32,32)), iter)
 end
+
+const IWorld2D = IWorld{2}
+const IWorld3D = IWorld{3}
 
 #################################################### FUNCTIONS #######################################################
 

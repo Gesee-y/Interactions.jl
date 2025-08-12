@@ -4,8 +4,11 @@
 
 module Interactions
 
-using ..MathLib
-using ..Arceus
+include(joinpath("..", "..", "Arceus.jl","src", "Arceus.jl"))
+include(joinpath("..", "..", "MathLib.jl","src", "MathLib.jl"))
+
+using .MathLib
+using .Arceus
 
 const IReal = Float32
 

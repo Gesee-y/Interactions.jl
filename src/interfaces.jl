@@ -33,6 +33,10 @@ Record of particles and the force they subscribed for.
 mutable struct ForceRegistry
 	registry::Vector{Pair{Particle, AbstractForce}}
 	dt::Float32
+
+    ## Constructors
+
+    ForceRegistry() = new(Pair{Particle, AbstractForce}[], 1/60)
 end
 
 #################################################### FUNCTIONS #######################################################

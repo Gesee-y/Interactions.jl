@@ -40,6 +40,7 @@ mutable struct Particle{N} <: AbstractBody{N}
 end
 
 const Particle2D = Particle{2}
+const Particle3D = Particle{3}
 
 #################################################### FUNCTIONS #######################################################
 
@@ -92,3 +93,5 @@ Set the inverse mass of the particle `p`. Useful to make infinite mass object.
 setinvmass!(p::Particle, invm::IReal) = setfield(p,:inverse_mass, invm)
 
 clear_accumulate_force(p::Particle) = (p.forceAccum .= zero(IReal))
+get_dimensions(p::Particle) = (p.position..., 20, 20)
+get_dimensions(p::Particle2D) = (p.position.x, p.position.y, 20, 20)

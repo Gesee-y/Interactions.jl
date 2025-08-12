@@ -9,22 +9,22 @@ export CollisionGrid, ProcessObjects
 const BIT_WIDTH = 5 # The number of bits allocated for a given data
 const DEFAULT_MASK = (UInt64(1) << BIT_WIDTH) - 1 # The default mask to get a particular data
 
-struct CollisionGrid{N,L}
+struct CollisionGrid{T,N,L}
 	mask::UInt # The lookup mask for the bitboard
 	size::NTuple{2,Int} # The size of the world to skip offscreen entities
-	zones::SMatrix{Vector,N,N,L} # Our Vector of zones
+	zones::Matrix{Vector{T}} # Our Vector of zones
 	bitboard::MagicBitboard # The bitboard (see `Arceus.jl`)
 
 	# Constructor
 
-	function CollisionGrid{N}(size) where N
-		mask = UInt(2)^(BIT_WIDTH*4)-1 # We get our look up mask, a serie of 1
-		zones = SMatrix{Vector,N,N,L}(undef)
+	function CollisionGrid{T,N}(size) where {T <: Any, N}
+		mask = UInt64((1 << (2BIT_WIDTH))-1) # We get our look up mask, a serie of 1
+		zones = Matrix{Vector{T}}(undef, N, N)
 		for i in eachindex(zones)
-			zones[i] = Vector{Any}()
+			zones[i] = T[]
 		end
 
-		new{N,N*N}(mask, (size[1], size[2]), zones, MagicBitboard(mask,0,0, MakeRoute, Vector{Int}))
+		new{T,N,N*N}(mask, (size[1], size[2]), zones, MagicBitboard(mask,0,44, MakeRoute, Vector{UInt64}; PEXT=true))
 	end
 end
 
@@ -54,48 +54,52 @@ end
 This automatically route the object `obj` to the correct grids cells using bitboard lookup, making this function
 super fast.
 """
-function SetInZone(grid::CollisionGrid{N,L}, obj::AbstractBody) where {N,L}
-	xs,xe = obj.rect.x, obj.rect.x + obj.rect.w
-	ys,ye = obj.rect.y, obj.rect.y + obj.rect.h
+function SetInZone(grid::CollisionGrid{T,N,L}, obj::T) where {T,N,L}
+	x0,y0,w0,h0 = get_dimensions(obj)
 	size = 1 << BIT_WIDTH # The size of our mask
 
-	x_start, x_end = _map_to_range(xs,1:size,grid.size[1]), _map_to_range(xe,1:size,grid.size[1])
-	y_start, y_end = _map_to_range(ys,1:size,grid.size[2]), _map_to_range(ye,1:size,grid.size[2])
+	x, w = _map_to_range(x0,1:size,grid.size[1]), _map_to_range(w0,1:size,grid.size[1])
+	y, h = _map_to_range(y0,1:size,grid.size[2]), _map_to_range(h0,1:size,grid.size[2])
 
-    !(0 ≤ x_start ≤ 31 && 0 ≤ x_end ≤ 31 && 0 ≤ y_start ≤ 31 && 0 ≤ y_end ≤ 31) && return
+    !(0 ≤ x ≤ 31 && 0 ≤ y ≤ 31) && return
 
-	traits = to_bit_boundingbox(x_start,x_end,y_start,y_end)
-	zones = grid.bitboard[traits]
+	traits = to_bit_boundingbox(w,h,1,1)
+	zones::Vector{UInt64} = grid.bitboard[traits]
     
-    data = grid.zones.data
-	for i in zones
-		push!(data[i], obj)
+    data = grid.zones
+    offset = _compute_coordinate((x,y), (size,size))
+	@inbounds for i = x:x+w, j=y:y+h
+		idx = i + (j-1)*size + offset
+	#@inbounds for i in zones
+	#	idx = i+offset
+		idx <= L && push!(data[idx], obj)
 	end
 end
 
 # Create the bounding box of the object but as a collection of bits
-to_bit_boundingbox(x_start, x_end, y_start, y_end;size=BIT_WIDTH) = (y_end << size*3) | (y_start << size*2) | (x_end << size) | (x_start)
+to_bit_boundingbox(w, h, x, y;size=BIT_WIDTH)::UInt = (y << size*3) | (x << size*2) | (h << size) | (w)
 
 """
-    MakeRoute(x::UInt64;size=BIT_WIDTH)
+    MakeRoute(x::UInt64)
 
 This is our lookup function, it takes a bit bounding box as input and output all the zones he is in.
 Using magic bitboard, foreach possible bounding box, a collection of zones are directly mapped to it
 """
-function MakeRoute(x::UInt64;size=BIT_WIDTH)
+function MakeRoute(x::UInt64)
 	# We collect our data just by decoding them from `x`.
 	# I guess it's not so hard to understand.
 	# We first use the mask to put to zero all irrelevants data with a AND
 	# Then if necessary we use shift to put the data at their correct position, 
 	# this remove the offset we added to them in `to_bit_boundingbox`
-	x_start, x_end = (x & DEFAULT_MASK) + 1, ((x & (DEFAULT_MASK << size)) >> size) + 1
-	y_start, y_end = ((x & (DEFAULT_MASK << size*2)) >> size*2) + 1, ((x & (DEFAULT_MASK << size*3)) >> size*3) + 1
+	sz = BIT_WIDTH
+	w, h = (x & DEFAULT_MASK) + 1, ((x & (DEFAULT_MASK << sz)) >> sz) + 1
+	x_start, y_start = ((x & (DEFAULT_MASK << sz*2)) >> sz*2) + 1, ((x & (DEFAULT_MASK << sz*3)) >> sz*3) + 1
 
-    result::Vector{NTuple{2,Int}} = NTuple{2,Int}[]
-    size = 1 << BIT_WIDTH # Faster than doing 2^BIT_WIDTH
+    result::Vector{UInt64} = UInt64[]
+    size = 1 << sz # Faster than doing 2^sz
 	
-	for i in x_start:x_end
-		for j in y_start:y_end
+	for i in x_start:w
+		for j in y_start:h
 			push!(result, _compute_coordinate((i,j),(size,size)))
 		end
 	end
